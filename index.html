@@ -1,14 +1,580 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-    <title>몰라</title>
+    <meta charset="UTF-8">
+    <title>Lexio Online</title>
     <style>
-        h1 {
-            font-size: 100px;
-        }
+        body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f0f0f0; margin: 0; height: 100vh; justify-content: space-between; }
+        #gameArea { display: flex; flex-direction: column; align-items: center; width: 100%; }
+        #topBar { display: flex; justify-content: space-between; width: 95%; padding: 10px; align-items: center; }
+        #suitDisplay { font-size: 1.5em; }
+        #roomInfo { font-size: 1em; }
+        #logDiv { width: 90%; height: 100px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; background-color: #fff; }
+        #opponentBoard { display: flex; justify-content: space-around; width: 90%; margin-bottom: 10px; min-height: 120px; }
+        .opponent-hand { border: 1px solid #ddd; padding: 5px; background-color: #fff; border-radius: 5px; text-align: center; }
+        #currentCardDisplay { width: 90%; min-height: 120px; border: 2px dashed #aaa; padding: 10px; margin-bottom: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #e9e9e9; }
+        .combo-info { font-weight: bold; margin-bottom: 5px; }
+        .combo-cards { display: flex; flex-wrap: wrap; justify-content: center; }
+        #controls { margin-bottom: 10px; display: flex; gap: 10px; }
+        #hand { display: flex; flex-wrap: wrap; justify-content: center; padding: 10px; background-color: #fff; border: 1px solid #ccc; border-radius: 5px; min-height: 100px; width: 90%; }
+        .card { border: 1px solid #000; padding: 5px 10px; margin: 5px; cursor: pointer; border-radius: 5px; display: flex; flex-direction: column; align-items: center; min-width: 60px; min-height: 80px; justify-content: space-between; position: relative; background-color: #fff; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
+        .card.selected { background-color: #a0e0ff; }
+        .card .suit-icon { position: absolute; top: 5px; left: 5px; font-size: 0.8em; }
+        .card .card-value { font-size: 1.2em; font-weight: bold; margin-top: 15px; }
+        .redCard { color: red; border-color: red; }
+        .yellowCard { color: #b08f00; border-color: #b08f00; } /* Darker yellow for text */
+        .greenCard { color: green; border-color: green; }
+        .blueCard { color: blue; border-color: blue; }
+        
+        #playersContainer { display: flex; justify-content: space-around; width: 100%; padding: 10px; background-color: #ddd; border-top: 1px solid #ccc; }
+        .player-ui { border: 1px solid #999; padding: 10px; background-color: #f9f9f9; border-radius: 5px; width: 150px; text-align: center; }
+        .player-ui.active-turn { background-color: #a0e0ff; box-shadow: 0 0 10px blue; }
+        .player-ui.eliminated { opacity: 0.5; background-color: #aaa; }
+        .player-ui .nickname { font-weight: bold; }
+        .player-ui .score { font-size: 0.9em; }
+        .player-ui .card-count { font-size: 0.9em; }
+        .player-ui .eliminated-text { font-weight: bold; color: red; }
+
+        #gameOverOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); display: none; flex-direction: column; justify-content: center; align-items: center; color: white; z-index: 1000; }
+        #gameOverOverlay button { padding: 10px 20px; margin: 10px; font-size: 1.2em; }
+        #giveupBtn { opacity: 0.3; pointer-events: none; background-color: #999; }
+        #giveupBtn.active { opacity: 1; pointer-events: auto; background-color: #ff6b6b; color:white; }
+
+        #nicknameModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1001;}
+        #nicknameInputDiv { background: white; padding: 20px; border-radius: 5px; }
     </style>
 </head>
 <body>
-    <h1>몰라</h1>
+    <div id="nicknameModal">
+        <div id="nicknameInputDiv">
+            <input type="text" id="nicknameInput" placeholder="Enter nickname">
+            <button id="setNicknameBtn">Set Nickname</button>
+        </div>
+    </div>
+
+    <div id="gameArea">
+        <div id="topBar">
+            <div id="suitDisplay">구름 &lt; 별 &lt; 달 &lt; 해</div>
+            <div id="roomInfo">Room: Lexio Game</div> 
+        </div>
+
+        <div id="logDiv">Game log will appear here...</div>
+        
+        <div id="opponentBoard">
+            <!-- Opponent's played cards might go here or be integrated elsewhere -->
+        </div>
+
+        <div id="currentCardDisplay">
+            <div class="combo-info">Played Combo Type: N/A</div>
+            <div class="combo-cards">
+                <!-- Played cards will be shown here -->
+            </div>
+        </div>
+
+        <div id="hand">
+            <!-- Player's hand will be rendered here -->
+        </div>
+
+        <div id="controls">
+            <button id="playBtn">Play</button>
+            <button id="passBtn">Pass</button>
+            <button id="giveupBtn">Give Up</button> 
+            <button id="startGameBtn">Start Game</button>
+            <button id="startBotGameBtn">Start Bot Game</button>
+        </div>
+    </div>
+
+    <div id="playersContainer">
+        <!-- Player UI elements will be dynamically inserted here -->
+        <!-- Example structure for one player:
+        <div class="player-ui" id="player-ui-socketid">
+            <div class="nickname">Player1</div>
+            <div class="score">Score: 64</div>
+            <div class="card-count">Cards: 10</div>
+            <div class="eliminated-text" style="display:none;">Eliminated</div>
+        </div>
+        -->
+    </div>
+
+    <div id="gameOverOverlay">
+        <h2 id="gameOverMessage">Game Over!</h2>
+        <div id="finalScores"></div>
+        <button id="rematchBtn" style="display:none;">Restart Game</button>
+        <button id="backToMenuBtn" style="display:none;">Main Menu</button>
+        <button id="exitGameBtn" style="display:none;">Exit</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io(); // Plan Item 6: Changed socket URL
+
+        let myId = null;
+        let nicknames = {}; // Store all player nicknames { socketId: "nickname" }
+        let scores = {};    // Store all player scores { socketId: 64 }
+        let eliminatedPlayers = {}; // Store elimination status { socketId: false }
+        let playerOrder = []; // To maintain a consistent order for player UIs
+
+        const handDiv = document.getElementById('hand');
+        const playBtn = document.getElementById('playBtn');
+        const passBtn = document.getElementById('passBtn');
+        const startGameBtn = document.getElementById('startGameBtn');
+        const startBotGameBtn = document.getElementById('startBotGameBtn');
+        const giveupBtn = document.getElementById('giveupBtn');
+        const logDiv = document.getElementById('logDiv');
+        const currentCardDisplay = document.getElementById('currentCardDisplay').querySelector('.combo-cards');
+        const currentComboInfo = document.getElementById('currentCardDisplay').querySelector('.combo-info');
+        
+        const nicknameModal = document.getElementById('nicknameModal');
+        const nicknameInput = document.getElementById('nicknameInput');
+        const setNicknameBtn = document.getElementById('setNicknameBtn');
+
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const gameOverMessage = document.getElementById('gameOverMessage');
+        const finalScoresDiv = document.getElementById('finalScores');
+        const rematchBtn = document.getElementById('rematchBtn');
+        const backToMenuBtn = document.getElementById('backToMenuBtn');
+        const exitGameBtn = document.getElementById('exitGameBtn');
+
+        const playersContainer = document.getElementById('playersContainer');
+
+        // Utility to add log messages
+        function addLog(message, type = 'info') {
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            if (type === 'error') logEntry.style.color = 'red';
+            if (type === 'system') logEntry.style.color = 'blue';
+            if (type === 'pass') logEntry.style.fontStyle = 'italic';
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Card visualization helpers
+        function getSuitIcon(suit) {
+            if (suit === '해') return '☀️';
+            if (suit === '별') return '⭐';
+            if (suit === '달') return '🌙';
+            if (suit === '구름') return '☁️';
+            return '';
+        }
+
+        function getColorClass(suit) {
+            if (suit === '해') return 'redCard';
+            if (suit === '별') return 'yellowCard';
+            if (suit === '달') return 'greenCard';
+            if (suit === '구름') return 'blueCard';
+            return '';
+        }
+        
+        function getCardLabel(card) { // Kept for value, suit icon handled separately
+            return `${card.value}`;
+        }
+
+        function renderCard(card, isPlayerHand = false) {
+            const cardDiv = document.createElement('div');
+            cardDiv.classList.add('card', getColorClass(card.suit));
+            cardDiv.dataset.value = card.value;
+            cardDiv.dataset.suit = card.suit;
+
+            const suitIconSpan = document.createElement('span');
+            suitIconSpan.classList.add('suit-icon');
+            suitIconSpan.textContent = getSuitIcon(card.suit);
+            cardDiv.appendChild(suitIconSpan);
+
+            const valueSpan = document.createElement('span');
+            valueSpan.classList.add('card-value');
+            valueSpan.textContent = getCardLabel(card); // Only value
+            cardDiv.appendChild(valueSpan);
+            
+            if (isPlayerHand) {
+                cardDiv.onclick = () => cardDiv.classList.toggle('selected');
+            }
+            return cardDiv;
+        }
+
+        function renderHand(hand) {
+            handDiv.innerHTML = '';
+            // Sort hand: by valueOrder, then by suitStrength
+            const valueOrder = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 1, 2];
+            const suitStrength = { "구름": 1, "별": 2, "달": 3, "해": 4 };
+            
+            hand.sort((a, b) => {
+                const valA = valueOrder.indexOf(a.value);
+                const valB = valueOrder.indexOf(b.value);
+                if (valA !== valB) return valA - valB;
+                return suitStrength[a.suit] - suitStrength[b.suit];
+            });
+
+            hand.forEach(card => {
+                handDiv.appendChild(renderCard(card, true));
+            });
+        }
+
+        // New Player UI Rendering Function (Plan Item 1)
+        function renderOrUpdatePlayerUI(playerId, nickname, score, cardCount, isTurn, isEliminated) {
+            let playerDiv = document.getElementById(`player-ui-${playerId}`);
+            if (!playerDiv) {
+                playerDiv = document.createElement('div');
+                playerDiv.classList.add('player-ui');
+                playerDiv.id = `player-ui-${playerId}`;
+                playerDiv.innerHTML = `
+                    <div class="nickname"></div>
+                    <div class="score"></div>
+                    <div class="card-count"></div>
+                    <div class="eliminated-text" style="display:none;">탈락</div>
+                `;
+                playersContainer.appendChild(playerDiv);
+            }
+
+            playerDiv.querySelector('.nickname').textContent = nickname || playerId;
+            playerDiv.querySelector('.score').textContent = `점수: ${score !== undefined ? score : 'N/A'}`;
+            playerDiv.querySelector('.card-count').textContent = isEliminated ? '' : `카드: ${cardCount !== undefined ? cardCount : 'N/A'}`;
+            
+            playerDiv.classList.toggle('active-turn', isTurn);
+            playerDiv.classList.toggle('eliminated', isEliminated);
+            playerDiv.querySelector('.eliminated-text').style.display = isEliminated ? 'block' : 'none';
+            
+            if (playerId === myId) {
+                playerDiv.style.borderColor = 'gold'; // Highlight current player's own UI
+            }
+            return playerDiv;
+        }
+        
+        function updateAllPlayerUIs(currentPlayersData, currentTurnId) {
+            // currentPlayersData = [{id, nickname, score, cardCount, isEliminated}, ...]
+            // First, ensure playerOrder is up-to-date
+            playerOrder = currentPlayersData.map(p => p.id);
+            
+            playersContainer.innerHTML = ''; // Clear and redraw to maintain order
+
+            playerOrder.forEach(pid => {
+                const pData = currentPlayersData.find(p => p.id === pid);
+                if (pData) {
+                    renderOrUpdatePlayerUI(
+                        pData.id, 
+                        pData.nickname, 
+                        pData.score, 
+                        pData.cardCount, 
+                        pid === currentTurnId, 
+                        pData.isEliminated
+                    );
+                }
+            });
+        }
+
+
+        // Event Listeners
+        setNicknameBtn.onclick = () => {
+            const nickname = nicknameInput.value.trim();
+            if (nickname) {
+                socket.emit('setNickname', { nickname });
+                // Nickname modal hidden on confirmation from server or immediately
+            }
+        };
+
+        startGameBtn.onclick = () => socket.emit('triggerGameStart', { mode: 'human' });
+        startBotGameBtn.onclick = () => socket.emit('triggerGameStart', { mode: 'bot' });
+        giveupBtn.onclick = () => {
+            if (giveupBtn.classList.contains('active')) {
+                if(confirm("정말로 게임을 포기하시겠습니까? 점수가 0점이 됩니다.")) {
+                    socket.emit('giveup');
+                }
+            }
+        };
+
+        playBtn.onclick = () => {
+            const selectedCards = Array.from(handDiv.querySelectorAll('.card.selected')).map(cardDiv => ({
+                value: parseInt(cardDiv.dataset.value),
+                suit: cardDiv.dataset.suit
+            }));
+            if (selectedCards.length > 0) {
+                socket.emit('play', { cards: selectedCards });
+            } else {
+                addLog('카드를 선택해주세요.', 'error');
+            }
+        };
+        passBtn.onclick = () => socket.emit('pass');
+        
+        rematchBtn.onclick = () => socket.emit('finalVote', { vote: 'rematch' });
+        backToMenuBtn.onclick = () => {
+            socket.emit('finalVote', { vote: 'main' });
+            // Client-side redirect or state change might happen here or on server confirmation
+            addLog("메인 메뉴로 돌아갑니다 (기능 구현 필요).", "system");
+            gameOverOverlay.style.display = 'none'; 
+        };
+        exitGameBtn.onclick = () => {
+            socket.emit('finalVote', { vote: 'exit' });
+            addLog("게임을 종료합니다 (기능 구현 필요).", "system");
+            window.close(); // May not work in all browsers
+        };
+
+        // Socket Event Handlers
+        socket.on('connect', () => {
+            myId = socket.id;
+            addLog('서버에 연결되었습니다.', 'system');
+        });
+
+        socket.on('requestNickname', () => {
+            nicknameModal.style.display = 'flex';
+        });
+        
+        socket.on('playerList', (data) => {
+            nicknames = data.nicknames; // Update global nicknames
+            // The server should send a more complete player state for UI updates,
+            // for now, we just log or update what we can.
+            // This event is more for lobby updates. For in-game, rely on newRound/scoreUpdate etc.
+            addLog(`플레이어 목록 업데이트: ${Object.values(nicknames).join(', ')}`, 'system');
+            if (playerOrder.length === 0 && data.players) { // Initial player list
+                 playerOrder = data.players.map(p => p.id);
+            }
+            // Potentially update player UIs if in lobby state
+        });
+
+        socket.on('nicknameConfirmed', (data) => {
+            nicknameModal.style.display = 'none';
+            myId = socket.id; // Ensure myId is set
+            nicknames[myId] = data.nickname;
+            addLog(`닉네임이 ${data.nickname}(으)로 설정되었습니다.`, 'system');
+        });
+        
+        socket.on('gameMessage', (message) => {
+            addLog(message, 'system');
+            // Plan Item 7: Cloud 3 Holder Display (simple version)
+            if (message.includes("구름 3을 가지고 시작합니다")) {
+                // More prominent display could be added if needed
+            }
+        });
+
+        socket.on('gameError', (message) => {
+            addLog(message, 'error');
+            alert(message); // Also show as alert for important errors
+        });
+
+        socket.on('invalidPlay', (message) => {
+            addLog(`잘못된 플레이: ${message}`, 'error');
+        });
+
+        // This might be part of 'newRound' or a separate event
+        socket.on('startGame', (data) => { // Or newRound
+            addLog('게임 시작!', 'system');
+            playerOrder = data.players.map(p => p.id); // Server should send player order
+            nicknames = data.nicknames;
+            scores = data.scores;
+            eliminatedPlayers = data.eliminatedPlayers || {};
+            
+            const initialPlayerStates = playerOrder.map(pid => ({
+                id: pid,
+                nickname: nicknames[pid] || pid,
+                score: scores[pid],
+                cardCount: data.hands[pid] ? data.hands[pid].length : (data.handCounts ? data.handCounts[pid] : 'N/A'), // Server needs to provide this
+                isEliminated: eliminatedPlayers[pid] || false
+            }));
+            updateAllPlayerUIs(initialPlayerStates, data.currentTurnId);
+
+            if (data.hand) renderHand(data.hand);
+            gameOverOverlay.style.display = 'none';
+            rematchBtn.style.display = 'none';
+            backToMenuBtn.style.display = 'none';
+            exitGameBtn.style.display = 'none';
+        });
+
+        socket.on('newRound', (data) => {
+            addLog('새 라운드 시작!', 'system');
+            gameOverOverlay.style.display = 'none'; // Hide if shown for round end
+            currentCardDisplay.innerHTML = '';
+            currentComboInfo.textContent = 'Played Combo Type: N/A';
+
+            scores = data.scores;
+            nicknames = data.nicknames;
+            eliminatedPlayers = data.eliminatedPlayers;
+            playerOrder = data.players.map(p => p.id); // Assuming server sends full player list with order
+
+            const playerStates = playerOrder.map(pid => ({
+                id: pid,
+                nickname: nicknames[pid] || pid,
+                score: scores[pid],
+                // Card count might come from hand length if full hands are sent, or a separate handCounts object
+                cardCount: data.hand && pid === myId ? data.hand.length : (eliminatedPlayers[pid] ? '탈락' : '?'), // Placeholder for others
+                isEliminated: eliminatedPlayers[pid] || false
+            }));
+            // Server should send currentTurnId with newRound
+            // For now, relying on a subsequent 'turn' event or handCounts to fully update UI
+            updateAllPlayerUIs(playerStates, null); // No specific turn yet, or server sends it
+            
+            if (data.hand) {
+                renderHand(data.hand);
+            }
+            // Ensure giveup button is reset (server usually controls this via activate/deactivate)
+            giveupBtn.classList.remove('active');
+            giveupBtn.style.opacity = '0.3';
+            giveupBtn.style.pointerEvents = 'none';
+        });
+
+        socket.on('turn', (data) => {
+            addLog(`${data.nickname}님의 턴입니다.`, 'system');
+            // Update all player UIs to reflect whose turn it is
+            const currentPlayers = playerOrder.map(pid => ({
+                id: pid,
+                nickname: nicknames[pid] || pid,
+                score: scores[pid],
+                cardCount: document.getElementById(`player-ui-${pid}`)?.querySelector('.card-count').textContent.split(': ')[1] || '?', // Preserve existing if possible
+                isEliminated: eliminatedPlayers[pid] || false
+            }));
+            updateAllPlayerUIs(currentPlayers, data.playerId);
+
+            if (data.playerId === myId) {
+                // My turn - enable controls
+                playBtn.disabled = false;
+                passBtn.disabled = false;
+            } else {
+                // Opponent's turn - disable controls
+                playBtn.disabled = true;
+                passBtn.disabled = true;
+            }
+        });
+
+        socket.on('cardPlayed', (data) => {
+            const { playerId, nickname, comboType, cards } = data;
+            addLog(`${nickname}님이 ${comboType || '카드'}를 냈습니다: ${cards.map(getCardLabel).join(', ')}`);
+            currentCardDisplay.innerHTML = '';
+            cards.forEach(card => {
+                currentCardDisplay.appendChild(renderCard(card, false));
+            });
+            currentComboInfo.textContent = `Played: ${nickname} - ${comboType || '카드'}`;
+            // Hand counts will be updated by 'handCounts' event
+        });
+
+        socket.on('scoreUpdate', (data) => { // Plan Item 5
+            scores = data.scores;
+            nicknames = data.nicknames; // Ensure nicknames are fresh
+            eliminatedPlayers = data.eliminatedPlayers || eliminatedPlayers; // Update if sent
+
+            const currentPlayers = playerOrder.map(pid => ({
+                id: pid,
+                nickname: nicknames[pid] || pid,
+                score: scores[pid],
+                cardCount: document.getElementById(`player-ui-${pid}`)?.querySelector('.card-count').textContent.split(': ')[1] || '?',
+                isEliminated: eliminatedPlayers[pid] || false
+            }));
+            const currentTurnPlayer = document.querySelector('.player-ui.active-turn')?.id.split('player-ui-')[1];
+            updateAllPlayerUIs(currentPlayers, currentTurnPlayer);
+        });
+        
+        socket.on('handCounts', (data) => { // Plan Item 1, 5
+            const { handCounts } = data; // Server sends { playerId1: count, playerId2: count, ... }
+            nicknames = data.nicknames || nicknames; // Update if server sends them
+
+            playerOrder.forEach(pid => {
+                const playerDiv = document.getElementById(`player-ui-${pid}`);
+                if (playerDiv && handCounts[pid] !== undefined) {
+                    if (eliminatedPlayers[pid]) {
+                         playerDiv.querySelector('.card-count').textContent = '';
+                    } else {
+                         playerDiv.querySelector('.card-count').textContent = `카드: ${handCounts[pid]}`;
+                    }
+                }
+            });
+        });
+        
+        socket.on('playerEliminated', (data) => { // Plan Item 8
+            const { playerId, nickname, scores: newScores, eliminatedPlayers: newEliminated } = data;
+            addLog(`${nickname}님이 탈락했습니다!`, 'system');
+            scores = newScores;
+            eliminatedPlayers = newEliminated;
+            nicknames = data.nicknames || nicknames;
+
+            const currentPlayers = playerOrder.map(pid => ({
+                id: pid,
+                nickname: nicknames[pid] || pid,
+                score: scores[pid],
+                cardCount: document.getElementById(`player-ui-${pid}`)?.querySelector('.card-count').textContent.split(': ')[1] || '?',
+                isEliminated: eliminatedPlayers[pid] || false
+            }));
+             const currentTurnPlayer = document.querySelector('.player-ui.active-turn')?.id.split('player-ui-')[1];
+            updateAllPlayerUIs(currentPlayers, currentTurnPlayer);
+        });
+        
+        socket.on('resetBoard', () => {
+            currentCardDisplay.innerHTML = '';
+            currentComboInfo.textContent = 'Played Combo Type: N/A';
+            addLog('보드가 초기화되었습니다.', 'system');
+        });
+
+        // Give Up Button Logic (Plan Item 4)
+        socket.on('activateGiveUpButton', () => {
+            giveupBtn.classList.add('active');
+            giveupBtn.style.opacity = '1';
+            giveupBtn.style.pointerEvents = 'auto';
+            giveupBtn.style.backgroundColor = '#ff6b6b'; // Example active color
+        });
+
+        socket.on('deactivateGiveUpButton', () => {
+            giveupBtn.classList.remove('active');
+            giveupBtn.style.opacity = '0.3';
+            giveupBtn.style.pointerEvents = 'none';
+            giveupBtn.style.backgroundColor = '#999';
+        });
+        
+        socket.on('roundOver', (data) => {
+            const { winnerNickname, roundPenalties, scores: finalScoresUpdate } = data;
+            addLog(`라운드 종료! 승자: ${winnerNickname}`, 'system');
+            scores = finalScoresUpdate; // Update scores
+            // Update UI based on roundPenalties if needed, or just new scores.
+            // No final game over buttons here.
+            // The server will either start a new round or trigger finalGameOver.
+        });
+
+        socket.on('finalGameOver', (data) => { // Plan Item 3
+            const { winnerNickname, message, scores: finalScoresResult, nicknames: finalNicknames, eliminatedPlayers: finalEliminated } = data;
+            gameOverMessage.textContent = message || `게임 종료! ${winnerNickname ? winnerNickname + '님의 최종 승리!' : '승자 없음.'}`;
+            
+            scores = finalScoresResult;
+            nicknames = finalNicknames;
+            eliminatedPlayers = finalEliminated;
+
+            let scoresText = '<h3>최종 점수:</h3><ul>';
+            playerOrder.forEach(pid => {
+                scoresText += `<li>${nicknames[pid] || pid}: ${scores[pid]} ${eliminatedPlayers[pid] ? '(탈락)' : ''}</li>`;
+            });
+            scoresText += '</ul>';
+            finalScoresDiv.innerHTML = scoresText;
+
+            gameOverOverlay.style.display = 'flex';
+            rematchBtn.style.display = 'inline-block';
+            backToMenuBtn.style.display = 'inline-block';
+            exitGameBtn.style.display = 'inline-block';
+        });
+        
+        socket.on('gameReset', () => {
+            addLog("서버에 의해 게임이 초기화되었습니다. 로비로 돌아갑니다.", "system");
+            // Reset all client state to lobby state
+            handDiv.innerHTML = '';
+            currentCardDisplay.innerHTML = '';
+            currentComboInfo.textContent = 'Played Combo Type: N/A';
+            playersContainer.innerHTML = '';
+            gameOverOverlay.style.display = 'none';
+            playerOrder = [];
+            nicknames = {};
+            scores = {};
+            eliminatedPlayers = {};
+            // Show nickname modal if it was used
+            // socket.emit('requestNickname'); // Or server handles this
+        });
+        
+        socket.on('redirectToMain', () => {
+            addLog("메인 메뉴로 돌아갑니다.", "system");
+            // Implement actual redirection or UI change
+            window.location.href = "/"; // Example, if main menu is at root
+        });
+
+        socket.on('forceExit', () => {
+            addLog("게임이 종료됩니다.", "system");
+            window.close();
+        });
+
+        // Initial setup
+        addLog('Lexio 클라이언트를 시작합니다.', 'system');
+        // Request initial player list or wait for server to send
+        // socket.emit('getInitialPlayerList'); // If needed
+    </script>
 </body>
 </html>
