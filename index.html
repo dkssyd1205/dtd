@@ -1,14 +1,112 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>몰라</title>
+    <title>Lexio Game</title>
     <style>
-        h1 {
-            font-size: 100px;
+        body { font-family: sans-serif; }
+        .tile {
+            border: 1px solid black;
+            padding: 10px;
+            margin: 5px;
+            display: inline-block;
+            width: 50px;
+            height: 80px;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer; /* Add cursor pointer for selectable tiles */
         }
+        .tile.selected {
+            border-color: blue;
+            border-width: 3px;
+            box-shadow: 0 0 5px blue;
+        }
+        #game-board {
+            border: 2px solid green;
+            padding: 10px;
+            margin-bottom: 20px;
+            min-height: 120px;
+            display: flex; /* To arrange played sets */
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+        .played-set {
+            border: 1px solid darkgreen;
+            padding: 5px;
+            margin: 5px;
+            display: flex;
+        }
+        #player-areas {
+            border: 2px solid blue;
+            padding: 10px;
+        }
+        .player-area {
+            border: 1px solid lightblue;
+            margin-bottom: 10px;
+            padding: 5px;
+        }
+        .player-area.active-player {
+            background-color: #e0e0ff;
+        }
+        .player-hand {
+            min-height: 100px;
+            border: 1px dashed gray;
+            padding: 5px;
+            display: flex; /* To allow tiles to wrap */
+            flex-wrap: wrap;
+        }
+        #game-info {
+            border: 2px solid orange;
+            padding: 10px;
+            margin-top: 20px;
+            min-height: 50px;
+        }
+        #controls {
+            padding: 10px;
+            margin-top: 20px;
+        }
+        /* Basic styling for suits */
+        .tile-Sun { background-color: #FFDDDD; /* Light Red */ }
+        .tile-Moon { background-color: #DDFFDD; /* Light Green */ }
+        .tile-Star { background-color: #FFFFDD; /* Light Yellow */ }
+        .tile-Cloud { background-color: #DDDDFF; /* Light Blue */ }
     </style>
 </head>
 <body>
-    <h1>몰라</h1>
+    <div id="game-container">
+        <h1>Lexio</h1>
+
+        <div id="game-info">
+            <p>Welcome to Lexio! Click "Start Game" to begin.</p>
+            <p>Current Turn: <span id="current-player">N/A</span></p>
+            <p>Round Pot: <span id="round-pot">0</span> points</p>
+            <p>Last Played Hand: <span id="last-played-hand-info">N/A</span></p>
+        </div>
+
+        <div id="game-board">
+            <!-- Played tiles will appear here -->
+        </div>
+
+        <div id="player-areas">
+            <!-- Player areas will be dynamically added here -->
+            <!-- Example of how a player area might look (for visualization, actual content will be dynamic) -->
+            <!--
+            <div class="player-area" id="player-1-area">
+                <h3>Player 1 (<span class="player-score">0</span> points, <span class="tile-count">0</span> tiles)</h3>
+                <div class="player-hand" id="player-1-hand">
+                    <div class="tile tile-Sun">S <br/> 2</div>
+                    <div class="tile tile-Cloud">C <br/> 3</div>
+                </div>
+            </div>
+            -->
+        </div>
+
+        <div id="controls">
+            <button id="start-game-btn">Start Game</button>
+            <button id="play-selected-btn" disabled>Play Selected</button>
+            <button id="pass-turn-btn" disabled>Pass Turn</button>
+            <button id="forfeit-round-btn" style="display:none; background-color: lightcoral;">Forfeit Round</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
 </body>
 </html>
